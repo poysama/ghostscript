@@ -1,0 +1,66 @@
+diff -up ghostscript-8.70/psi/int.mak.scan-max-name-length ghostscript-8.70/psi/int.mak
+--- ghostscript-8.70/psi/int.mak.scan-max-name-length	2010-04-15 22:15:11.064754848 +0100
++++ ghostscript-8.70/psi/int.mak	2010-04-15 22:15:42.706629972 +0100
+@@ -255,7 +255,7 @@ bfont_h=$(PSSRC)bfont.h $(ifont_h)
+ icontext_h=$(PSSRC)icontext.h $(gsstype_h) $(icstate_h)
+ ifilter_h=$(PSSRC)ifilter.h $(istream_h) $(ivmspace_h)
+ igstate_h=$(PSSRC)igstate.h $(gsstate_h) $(gxstate_h) $(imemory_h) $(istruct_h) $(gxcindex_h)
+-iscan_h=$(PSSRC)iscan.h $(sa85x_h) $(sstring_h)
++iscan_h=$(PSSRC)iscan.h $(sa85x_h) $(sstring_h) $(inamestr_h)
+ sbhc_h=$(PSSRC)sbhc.h $(shc_h)
+ zfile_h=$(PSSRC)zfile.h
+ # Include files for optional features
+diff -up ghostscript-8.70/psi/iscan.c.scan-max-name-length ghostscript-8.70/psi/iscan.c
+--- ghostscript-8.70/psi/iscan.c.scan-max-name-length	2009-06-17 04:25:25.000000000 +0100
++++ ghostscript-8.70/psi/iscan.c	2010-04-15 22:15:42.707629862 +0100
+@@ -72,7 +72,7 @@ static inline void
+ dynamic_init(da_ptr pda, gs_memory_t *mem)
+ {
+     pda->is_dynamic = false;
+-    pda->limit = pda->buf + da_buf_size;
++    pda->limit = pda->buf + sizeof(pda->buf);
+     pda->next = pda->base = pda->buf;
+     pda->memory = mem;
+ }
+@@ -143,8 +143,12 @@ static void
+ dynamic_save(da_ptr pda)
+ {
+     if (!pda->is_dynamic && pda->base != pda->buf) {
+-	memcpy(pda->buf, pda->base, da_size(pda));
+-	pda->next = pda->buf + da_size(pda);
++        int len = da_size(pda);
++
++	if (len > sizeof(pda->buf))
++            len = sizeof(pda->buf);
++        memcpy(pda->buf, pda->base, len);
++	pda->next = pda->buf + len;
+ 	pda->base = pda->buf;
+     }
+ }
+diff -up ghostscript-8.70/psi/iscan.h.scan-max-name-length ghostscript-8.70/psi/iscan.h
+--- ghostscript-8.70/psi/iscan.h.scan-max-name-length	2008-08-28 23:48:19.000000000 +0100
++++ ghostscript-8.70/psi/iscan.h	2010-04-15 22:15:42.709629962 +0100
+@@ -20,6 +20,7 @@
+ 
+ #include "sa85x.h"
+ #include "sstring.h"
++#include "inamestr.h"
+ 
+ /*
+  * Define the state of the scanner.  Before calling scan_token initially,
+@@ -46,14 +47,12 @@ typedef struct scanner_state_s scanner_s
+  * or (only while control is inside scan_token) into the source stream buffer.
+  */
+ #define max_comment_line 255	/* max size of an externally processable comment */
+-#define max_dsc_line max_comment_line	/* backward compatibility */
+-#define da_buf_size (max_comment_line + 2)
+ typedef struct dynamic_area_s {
+     byte *base;
+     byte *next;
+     byte *limit;
+     bool is_dynamic;
+-    byte buf[da_buf_size];	/* initial buffer */
++    byte buf[max_name_string];	/* initial buffer, enough for a valid string */
+     gs_memory_t *memory;
+ } dynamic_area;
+ 

@@ -1,0 +1,81 @@
+diff -up ghostscript-8.70/jbig2dec/jbig2_generic.c.jbig2dec-nullderef ghostscript-8.70/jbig2dec/jbig2_generic.c
+--- ghostscript-8.70/jbig2dec/jbig2_generic.c.jbig2dec-nullderef	2009-05-29 07:48:44.000000000 +0100
++++ ghostscript-8.70/jbig2dec/jbig2_generic.c	2009-08-03 17:51:13.864875636 +0100
+@@ -596,6 +596,10 @@ jbig2_immediate_generic_region(Jbig2Ctx 
+   memcpy (params.gbat, gbat, gbat_bytes);
+ 
+   image = jbig2_image_new(ctx, rsi.width, rsi.height);
++  if (image == NULL)
++    return jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number,
++		       "failed to allocate buffer for image");
++
+   jbig2_error(ctx, JBIG2_SEVERITY_DEBUG, segment->number,
+     "allocated %d x %d image buffer for region decode results",
+         rsi.width, rsi.height);
+diff -up ghostscript-8.70/jbig2dec/jbig2_symbol_dict.c.jbig2dec-nullderef ghostscript-8.70/jbig2dec/jbig2_symbol_dict.c
+--- ghostscript-8.70/jbig2dec/jbig2_symbol_dict.c.jbig2dec-nullderef	2009-05-29 07:48:44.000000000 +0100
++++ ghostscript-8.70/jbig2dec/jbig2_symbol_dict.c	2009-08-03 17:52:35.318750131 +0100
+@@ -367,6 +367,11 @@ jbig2_decode_symbol_dict(Jbig2Ctx *ctx,
+ 		  memcpy(region_params.gbat, params->sdat, sdat_bytes);
+ 
+ 		  image = jbig2_image_new(ctx, SYMWIDTH, HCHEIGHT);
++		  if (image == NULL) {
++		      jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number,
++				  "failed to allocate image storage");
++		      return NULL;
++		  }
+ 
+ 		  code = jbig2_decode_generic_region(ctx, segment, &region_params,
+ 						     as, image, GB_stats);
+@@ -517,6 +522,11 @@ jbig2_decode_symbol_dict(Jbig2Ctx *ctx,
+ 			ID, RDX, RDY);
+ 
+ 		      image = jbig2_image_new(ctx, SYMWIDTH, HCHEIGHT);
++		      if (image == NULL) {
++			  jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number,
++				      "failed to allocate image storage");
++			  return NULL;
++		      }
+ 
+ 		      /* Table 18 */
+ 		      rparams.GRTEMPLATE = params->SDRTEMPLATE;
+@@ -635,6 +645,16 @@ jbig2_decode_symbol_dict(Jbig2Ctx *ctx,
+ 	for (j = HCFIRSTSYM; j < NSYMSDECODED; j++) {
+ 	  Jbig2Image *glyph;
+ 	  glyph = jbig2_image_new(ctx, SDNEWSYMWIDTHS[j], HCHEIGHT);
++	  if (glyph == NULL) {
++	      jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number,
++			  "error allocating image storage for glyph");
++	      while (--j >= HCFIRSTSYM) {
++		  jbig2_image_release(ctx, SDNEWSYMS->glyphs[j]);
++		  SDNEWSYMS->glyphs[j] = NULL;
++	      }
++	      jbig2_image_release(ctx, image);
++	      return NULL;
++	  }
+ 	  jbig2_image_compose(ctx, glyph, image,
+ 		-x, 0, JBIG2_COMPOSE_REPLACE);
+ 	  x += SDNEWSYMWIDTHS[j];
+diff -up ghostscript-8.70/jbig2dec/jbig2_text.c.jbig2dec-nullderef ghostscript-8.70/jbig2dec/jbig2_text.c
+--- ghostscript-8.70/jbig2dec/jbig2_text.c.jbig2dec-nullderef	2009-05-29 07:48:44.000000000 +0100
++++ ghostscript-8.70/jbig2dec/jbig2_text.c	2009-08-03 17:53:05.166750610 +0100
+@@ -312,6 +312,9 @@ jbig2_decode_text_region(Jbig2Ctx *ctx, 
+ 		IBO = IB;
+ 		refimage = jbig2_image_new(ctx, IBO->width + RDW,
+ 						IBO->height + RDH);
++		if (image == NULL)
++		    return jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number,
++				       "could not allocate image storage");
+ 
+ 		/* Table 12 */
+ 		rparams.GRTEMPLATE = params->SBRTEMPLATE;
+@@ -676,6 +679,9 @@ jbig2_parse_text_region(Jbig2Ctx *ctx, J
+     }
+ 
+     image = jbig2_image_new(ctx, region_info.width, region_info.height);
++    if (image == NULL)
++	return jbig2_error(ctx, JBIG2_SEVERITY_WARNING, segment->number,
++			   "unable to allocate image storage");
+ 
+     ws = jbig2_word_stream_buf_new(ctx, segment_data + offset, segment->data_length - offset);
+     if (!params.SBHUFF) {
